@@ -85,6 +85,7 @@ class Transformer(nn.Module) :
             final_data.append([word, root])
         return final_data
     
+    
     def prepare_data(self):
         """
         prepare our data for training/validation
@@ -138,7 +139,7 @@ class Transformer(nn.Module) :
 
         return final_emb
     
-    def multi_head_attention(self,Query, Key , Value, head_dim ,mask = False):
+    def multi_head_attention(self, Query, Key , Value, head_dim : int,mask = False) -> torch.tensor:
         """
         computes the attention filter of a given input embedding 
         """
@@ -165,7 +166,7 @@ class Transformer(nn.Module) :
 
     
 
-    def encoder_network(self, batch):
+    def encoder_network(self, batch : list) -> torch.tensor:
         """
         we encode a batch of data
         """
@@ -199,7 +200,7 @@ class Transformer(nn.Module) :
         return output # the final encoder output vector with applied attention 
 
 
-    def decoder_network(self, encoder_output):
+    def decoder_network(self, encoder_output : torch.tensor):
         """
         the decoder network of our transformer, i need to pay attention to the masking thing (for tomorrow :) )
         """

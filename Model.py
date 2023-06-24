@@ -1,21 +1,16 @@
 import torch 
 import torch.nn as nn 
-import pandas as pd
 import numpy as np
 import torch.optim as optim
 import math
 import random
 
 
-param_dict = {
-    "batch_size" : 10, 
-    
-}
 
 
 class Transformer(nn.Module) : 
 
-    def __init__(self, data, char_idx : dict , batch_size : int , embedding_size : int, attention_head_size : int, linear_size : int, learning_rate = 0.001 , dropout = 0.2) :
+    def __init__(self, data, char_idx : dict, num_epochs :int ,  batch_size : int , embedding_size : int, attention_head_size : int, linear_size : int, learning_rate = 0.001 , dropout = 0.2) :
         super().__init__()
 
         self.sow, self.eow = '$', '£'
@@ -30,6 +25,7 @@ class Transformer(nn.Module) :
         self.data = data 
         self.ratio = 0.8 # training data ratio
         self.batch_size = batch_size
+        self.num_epochs = num_epochs
         self.embedding_size = embedding_size
         self.att_head_size = attention_head_size
         self.linear_size = linear_size
@@ -71,6 +67,10 @@ class Transformer(nn.Module) :
         # we define our optimizer : 
         self.opt = optim.AdamW(self.parameters(), lr = learning_rate)
 
+        # we define our loss function : 
+        self.loss = nn.CrossEntropyLoss(ignore_index=self.char_idx[self.pad])
+
+
     def data_2_seq(self): 
         '''
         this function indexes our text data
@@ -93,10 +93,11 @@ class Transformer(nn.Module) :
         shuffled_data = random.sample(self.seq_data, data_size)
         middle_index = int(data_size * self.ratio)
         train_data, val_data = shuffled_data[:middle_index], shuffled_data[middle_index:]
-        train_batches = [train_data[i:i + self.batch_size] for i in range(0, data_size, self.batch_size)]
+        train_batches = [[train_data[i:i + self.batch_size][0],train_data[i:i + self.batch_size][1]] for i in range(0, data_size, self.batch_size)]
         val_batches = [val_data[i:i + self.batch_size] for i in range(0, data_size, self.batch_size)]
 
         return train_batches, val_batches
+
 
 
     def positional_encoding(self):
@@ -164,7 +165,7 @@ class Transformer(nn.Module) :
 
     
 
-    def encoder(self, batch):
+    def encoder_network(self, batch):
         """
         we encode a batch of data
         """
@@ -198,7 +199,7 @@ class Transformer(nn.Module) :
         return output # the final encoder output vector with applied attention 
 
 
-    def decoder(self, encoder_output):
+    def decoder_network(self, encoder_output):
         """
         the decoder network of our transformer, i need to pay attention to the masking thing (for tomorrow :) )
         """
@@ -259,30 +260,35 @@ class Transformer(nn.Module) :
         return final_output ,word_list 
             
 
-
-
-
-
-
-
-
     def fit(self): 
         """
         this is a method that assembles our transformer
         """
-        
         # we first split our data into batches : 
-        train_batches, val_batches = self.prepare_data()
+        train_batches, self.val_batches = self.prepare_data()
 
-        for batch in train_batches : 
+        for epoch in range(self.num_epochs):
+            print(f"epoch num {epoch}")
+            # we shuffle our batches : 
+            train_batches = random.sample(train_batches, len(train_batches))
+            for batch in train_batches :
+                word_batch, root_batch = zip(*batch)
+                self.opt.zero_grad()
+                encoder_output = self.encoder(list(word_batch))  
+                proba_output, word_list = self.decoder(encoder_output)
+                # we prepare the dimension of vectors for the loss
+                target_words = torch.tensor(root_batch)
+                batch_size, seq_length, emb_size = proba_output.size()
+                
+                proba_output = proba_output.view(batch_size * seq_length, emb_size)
+                target_words = target_words.view(batch_size * seq_length)
 
-            encoder_output = self.encoder(batch)  
-            final_output, word_list = self.decoder(encoder_output) 
+                # we finally calculate the loss 
+                loss = self.loss(proba_output, target_words)
+                loss.backward()
+                self.opt.step() 
 
-
-
-
-        pass
-
-
+                print("the current loss of this batch is : ", loss.item())
+            
+        torch.save(self.state_dict(), 'Transformer/model_par.pt')
         
